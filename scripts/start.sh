@@ -16,7 +16,14 @@ echo ""
 # Check if setup was run
 if [ ! -d "$ROTKI_DIR" ]; then
     echo "❌ Rotki not found. Please run setup first:"
-    echo "   $SCRIPT_DIR/setup.sh"
+    echo "   ./scripts/setup.sh"
+    exit 1
+fi
+
+# Check if uv venv exists
+if [ ! -d "$ROTKI_DIR/.venv" ]; then
+    echo "❌ Dependencies not installed. Please run setup first:"
+    echo "   ./scripts/setup.sh"
     exit 1
 fi
 
@@ -25,15 +32,15 @@ pkill -f "spaetzli_mock_server" 2>/dev/null || true
 pkill -f "rotkehlchen" 2>/dev/null || true
 sleep 1
 
-# Start mock server in background
+# Start mock server in background (using rotki's venv which has our deps)
 echo "🚀 Starting mock premium server on port $MOCK_PORT..."
-cd "$PROJECT_DIR"
-python3 -m spaetzli_mock_server --port $MOCK_PORT &
+cd "$ROTKI_DIR"
+PYTHONPATH="$PROJECT_DIR" uv run python -m spaetzli_mock_server --port $MOCK_PORT &
 MOCK_PID=$!
 
 # Wait for mock server to be ready
 echo "⏳ Waiting for mock server..."
-for i in {1..10}; do
+for i in {1..15}; do
     if curl -s "http://localhost:$MOCK_PORT/health" > /dev/null 2>&1; then
         echo "✅ Mock server ready"
         break
@@ -42,21 +49,32 @@ for i in {1..10}; do
 done
 
 # Start Rotki
-echo "🚀 Starting Rotki..."
+echo "🚀 Starting Rotki backend..."
 cd "$ROTKI_DIR"
-SPAETZLI_MOCK_URL="http://localhost:$MOCK_PORT" python3 -m rotkehlchen &
+SPAETZLI_MOCK_URL="http://localhost:$MOCK_PORT" uv run python -m rotkehlchen --api-port 4242 --api-cors http://localhost:* &
 ROTKI_PID=$!
+
+# Give Rotki a moment to start
+sleep 5
 
 echo ""
 echo "✅ Both services started!"
 echo ""
-echo "📍 Rotki UI:      http://localhost:4242"
+echo "📍 Rotki API:     http://localhost:4242"
 echo "📍 Mock Server:   http://localhost:$MOCK_PORT"
 echo ""
-echo "💡 Enter any API key/secret in Rotki's premium settings"
-echo "   (Settings → Premium → any values work)"
+echo "💡 To use the web UI, you have two options:"
 echo ""
-echo "Press Ctrl+C to stop both services"
+echo "   Option A: Use the Rotki frontend (recommended)"
+echo "   1. Open a new terminal"
+echo "   2. cd $ROTKI_DIR/frontend/app"
+echo "   3. npm install && npm run dev"
+echo "   4. Open http://localhost:8080"
+echo ""
+echo "   Option B: Use the installed Rotki app"
+echo "   The app will connect to localhost:4242 automatically"
+echo ""
+echo "Press Ctrl+C to stop services"
 echo ""
 
 # Handle shutdown
@@ -65,6 +83,8 @@ cleanup() {
     echo "🛑 Shutting down..."
     kill $MOCK_PID 2>/dev/null || true
     kill $ROTKI_PID 2>/dev/null || true
+    pkill -f "spaetzli_mock_server" 2>/dev/null || true
+    pkill -f "rotkehlchen" 2>/dev/null || true
     exit 0
 }
 trap cleanup SIGINT SIGTERM

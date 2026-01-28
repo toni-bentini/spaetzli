@@ -12,15 +12,17 @@ echo "🐦 Spaetzli Setup"
 echo "================="
 echo ""
 
-# Check for Python 3
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required but not installed."
-    exit 1
-fi
-
-# Check for pip
-if ! python3 -m pip --version &> /dev/null; then
-    echo "❌ pip is required but not installed."
+# Check for uv (recommended) or Python 3.11+
+if command -v uv &> /dev/null; then
+    echo "✅ Found uv package manager"
+    USE_UV=1
+elif python3 --version 2>&1 | grep -q "3.11\|3.12"; then
+    echo "✅ Found compatible Python"
+    USE_UV=0
+else
+    echo "❌ This script requires either:"
+    echo "   - uv (recommended): brew install uv"
+    echo "   - Python 3.11+: brew install python@3.11"
     exit 1
 fi
 
@@ -34,53 +36,39 @@ fi
 
 # Apply the Spaetzli patch to Rotki
 echo "🔧 Applying Spaetzli patch to Rotki..."
-PREMIUM_PY="$ROTKI_DIR/rotkehlchen/premium/premium.py"
-
-if grep -q "SPAETZLI_MOCK_URL" "$PREMIUM_PY" 2>/dev/null; then
-    echo "✅ Patch already applied"
+cd "$ROTKI_DIR"
+if [ "$USE_UV" = "1" ]; then
+    uv run --no-project python "$SCRIPT_DIR/apply_patch.py" "$ROTKI_DIR/rotkehlchen/premium/premium.py"
 else
-    # Backup original
-    cp "$PREMIUM_PY" "$PREMIUM_PY.backup"
-    
-    # Apply patch - add mock URL support after the staging check
-    sed -i.tmp '
-/rotki_base_url = .staging.rotki.com./a\
-\
-        # Support custom mock server via environment variables (Spaetzli)\
-        if mock_url := os.environ.get('"'"'SPAETZLI_MOCK_URL'"'"'):\
-            log.info(f'"'"'Using Spaetzli mock server at {mock_url}'"'"')\
-            self.rotki_api = f'"'"'{mock_url}/api/{self.apiversion}/'"'"'\
-            self.rotki_web = f'"'"'{mock_url}/webapi/{self.apiversion}/'"'"'\
-            self.rotki_nest = f'"'"'{mock_url}/nest/{self.apiversion}/'"'"'\
-        else:
-' "$PREMIUM_PY"
-    
-    # Also need to wrap the original URLs in else block - simpler approach: use our patched file
-    cp "$PROJECT_DIR/rotkehlchen/premium/premium.py" "$PREMIUM_PY"
-    rm -f "$PREMIUM_PY.tmp"
-    
-    echo "✅ Patch applied"
+    python3 "$SCRIPT_DIR/apply_patch.py" "$ROTKI_DIR/rotkehlchen/premium/premium.py"
 fi
 
-# Install mock server dependencies
-echo "📦 Installing mock server dependencies..."
-python3 -m pip install -q fastapi uvicorn python-multipart
-
-# Install Rotki dependencies (this can take a while)
-echo "📦 Installing Rotki dependencies (this may take a few minutes)..."
+# Install Rotki dependencies (this also creates the venv)
+echo "📦 Installing Rotki dependencies (this may take several minutes)..."
 cd "$ROTKI_DIR"
-python3 -m pip install -q -e . 2>/dev/null || {
-    echo "⚠️  Some dependencies may need manual installation."
-    echo "   Try: cd $ROTKI_DIR && pip install -e ."
-}
+
+if [ "$USE_UV" = "1" ]; then
+    echo "   Syncing with uv..."
+    uv sync 2>&1 | tail -10
+else
+    python3 -m pip install -e .
+fi
+
+# Install mock server dependencies into Rotki's venv
+echo "📦 Installing mock server dependencies..."
+cd "$PROJECT_DIR"
+if [ "$USE_UV" = "1" ]; then
+    cd "$ROTKI_DIR"
+    uv pip install fastapi uvicorn python-multipart 2>&1 | tail -5
+else
+    python3 -m pip install --quiet fastapi uvicorn python-multipart
+fi
+
+cd "$PROJECT_DIR"
 
 echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "To start Rotki with premium features:"
-echo "  1. Run: $SCRIPT_DIR/start.sh"
+echo "  ./scripts/start.sh"
 echo ""
-echo "Or manually:"
-echo "  Terminal 1: python3 -m spaetzli_mock_server --port 8080"
-echo "  Terminal 2: cd $ROTKI_DIR && SPAETZLI_MOCK_URL=http://localhost:8080 python3 -m rotkehlchen"
-echo "  Then open: http://localhost:4242"
