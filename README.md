@@ -8,6 +8,10 @@
   <em>Unlock Rotki premium features locally</em>
 </p>
 
+<p align="center">
+  <code>curl -fsSL https://raw.githubusercontent.com/toni-bentini/spaetzli/main/install.sh | bash</code>
+</p>
+
 ---
 
 **Spaetzli** is a mock server that emulates the Rotki premium API, allowing you to use premium features without a subscription. Perfect for local development, testing, or exploring what premium has to offer.
