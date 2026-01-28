@@ -1,5 +1,13 @@
 # Spaetzli Mock Premium Server
 
+<p align="center">
+  <img src="spaetzli-mascot.png" alt="Spaetzli Mascot" width="200">
+</p>
+
+<p align="center">
+  <em>Meet Spätzli, your friendly premium companion! 🐦</em>
+</p>
+
 A mock server for Rotki premium features, allowing local development and testing without a premium subscription.
 
 ## Features
