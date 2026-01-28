@@ -10,7 +10,7 @@
 
 ---
 
-**Spaetzli** is a mock server that emulates the Rotki premium API, allowing you to use premium features without a subscription. Perfect for local development, testing, or just exploring what premium has to offer.
+**Spaetzli** is a mock server that emulates the Rotki premium API, allowing you to use premium features without a subscription. Perfect for local development, testing, or exploring what premium has to offer.
 
 ## What it does
 
@@ -25,24 +25,59 @@ Spaetzli intercepts premium API calls and responds as if you have an active subs
 
 ## Quick Start
 
+### 1. Clone this repository
 ```bash
-# Install dependencies
-pip install -r spaetzli_mock_server/requirements.txt
-
-# Start the mock server
-python -m spaetzli_mock_server --port 8080
-
-# In another terminal, run Rotki with the mock
-SPAETZLI_MOCK_URL=http://localhost:8080 python -m rotkehlchen
+git clone https://github.com/toni-bentini/spaetzli.git
+cd spaetzli
 ```
 
-Then enter any API key/secret in Rotki's premium settings — Spaetzli accepts everything!
+### 2. Run setup (downloads Rotki & installs dependencies)
+```bash
+./scripts/setup.sh
+```
+
+### 3. Start everything
+```bash
+./scripts/start.sh
+```
+
+### 4. Open Rotki
+- Navigate to http://localhost:4242
+- Go to **Settings → Premium**
+- Enter any API key and secret (e.g., `test` / `dGVzdA==`)
+- Enjoy premium features! 🎉
+
+## Manual Setup
+
+If you prefer more control:
+
+```bash
+# Terminal 1: Start the mock server
+python3 -m spaetzli_mock_server --port 8080
+
+# Terminal 2: Start Rotki with mock
+cd rotki
+SPAETZLI_MOCK_URL=http://localhost:8080 python3 -m rotkehlchen
+
+# Open http://localhost:4242
+```
+
+## Project Structure
+
+```
+spaetzli/
+├── scripts/
+│   ├── setup.sh          # One-time setup
+│   └── start.sh          # Start both services
+├── spaetzli_mock_server/  # The mock premium server
+├── rotki/                 # Rotki source (after setup)
+└── plan.md               # Technical documentation
+```
 
 ## Documentation
 
-See [`spaetzli_mock_server/README.md`](spaetzli_mock_server/README.md) for detailed API documentation and configuration options.
-
-See [`plan.md`](plan.md) for the full technical analysis of Rotki's premium system.
+- [`spaetzli_mock_server/README.md`](spaetzli_mock_server/README.md) - Mock server API docs
+- [`plan.md`](plan.md) - Full technical analysis of Rotki's premium system
 
 ## Disclaimer
 
