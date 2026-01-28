@@ -83,6 +83,23 @@ spaetzli/
 - [`spaetzli_mock_server/README.md`](spaetzli_mock_server/README.md) - Mock server API docs
 - [`plan.md`](plan.md) - Full technical analysis of Rotki's premium system
 
+## Docker
+
+Run Spaetzli with Docker (everything included):
+
+```bash
+# Build the image
+./scripts/docker-build.sh
+
+# Run with docker-compose
+cd docker && docker-compose up
+
+# Or run directly
+docker run -p 8080:80 -v spaetzli-data:/data spaetzli:latest
+```
+
+Then open http://localhost:8080
+
 ## Disclaimer
 
 This project is for **educational and personal use only**. If you find Rotki useful, consider supporting the project with a [premium subscription](https://rotki.com/products).
