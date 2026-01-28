@@ -24,7 +24,7 @@ check_dependency() {
 check_dependency "git" "brew install git"
 check_dependency "curl" "brew install curl"
 
-# Check for uv or offer to install
+# Check for uv or install it
 if ! command -v uv &> /dev/null; then
     echo "📦 Installing uv (Python package manager)..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -35,14 +35,15 @@ fi
 if [ -d "$INSTALL_DIR" ]; then
     echo "📂 Updating existing installation..."
     cd "$INSTALL_DIR"
-    git pull --ff-only 2>/dev/null || {
-        echo "⚠️  Could not update, using existing version"
-    }
+    git fetch origin main
+    git reset --hard origin/main
 else
     echo "📥 Cloning Spaetzli..."
     git clone --depth 1 "$REPO" "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
 fi
+
+# Change to install directory
+cd "$INSTALL_DIR"
 
 # Run setup
 echo ""
