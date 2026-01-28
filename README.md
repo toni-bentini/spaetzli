@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
+</p>
+
+<p align="center">
   <code>curl -fsSL https://raw.githubusercontent.com/toni-bentini/spaetzli/main/install.sh | bash</code>
 </p>
 
