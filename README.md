@@ -12,6 +12,10 @@
   <code>curl -fsSL https://raw.githubusercontent.com/toni-bentini/spaetzli/main/install.sh | bash</code>
 </p>
 
+<p align="center">
+  <sub><b>Requirements:</b> git, curl · <b>Installs to:</b> ~/spaetzli</sub>
+</p>
+
 ---
 
 **Spaetzli** is a mock server that emulates the Rotki premium API, allowing you to use premium features without a subscription. Perfect for local development, testing, or exploring what premium has to offer.
@@ -26,6 +30,13 @@ Rotki is an open-source portfolio tracker that offers premium features like:
 - 🔔 Price watchers & alerts
 
 Spaetzli intercepts premium API calls and responds as if you have an active subscription, enabling all these features locally.
+
+## Requirements
+
+- **git** and **curl** (usually pre-installed on macOS/Linux)
+- **Python 3.11+** (for manual setup)
+- **Docker** (for Docker setup)
+- **uv** (auto-installed by the installer if missing)
 
 ## Quick Start
 
@@ -45,10 +56,24 @@ cd docker && docker-compose up
 
 Then open http://localhost:8080
 
-### Option 2: Manual Setup
+### Option 2: One-Line Installer
 
 ```bash
-# Clone and setup
+curl -fsSL https://raw.githubusercontent.com/toni-bentini/spaetzli/main/install.sh | bash
+```
+
+This installs to `~/spaetzli` and sets everything up. Then:
+
+```bash
+cd ~/spaetzli && ./scripts/start.sh
+```
+
+Open http://localhost:4242
+
+### Option 3: Manual Setup
+
+```bash
+# Clone wherever you want
 git clone https://github.com/toni-bentini/spaetzli.git
 cd spaetzli
 ./scripts/setup.sh
@@ -59,7 +84,7 @@ cd spaetzli
 
 Then open http://localhost:4242
 
-### Option 3: Manual Control
+### Option 4: Full Manual Control
 
 ```bash
 # Terminal 1: Start the mock server
