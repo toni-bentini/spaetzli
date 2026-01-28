@@ -7,7 +7,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ROTKI_DIR="$PROJECT_DIR/rotki"
-MOCK_PORT=8080
+
+# Function to find a free port
+find_free_port() {
+    local start_port=$1
+    local port=$start_port
+    while lsof -i :$port >/dev/null 2>&1; do
+        port=$((port + 1))
+        if [ $port -gt $((start_port + 100)) ]; then
+            echo "❌ Could not find free port" >&2
+            exit 1
+        fi
+    done
+    echo $port
+}
 
 echo "🐦 Starting Spaetzli"
 echo "==================="
@@ -27,12 +40,19 @@ if [ ! -d "$ROTKI_DIR/.venv" ]; then
     exit 1
 fi
 
-# Kill any existing processes on our ports
+# Find free ports
+MOCK_PORT=$(find_free_port 8090)
+ROTKI_PORT=$(find_free_port 4242)
+
+echo "📍 Using ports: Mock=$MOCK_PORT, Rotki=$ROTKI_PORT"
+echo ""
+
+# Kill any existing spaetzli processes
 pkill -f "spaetzli_mock_server" 2>/dev/null || true
 pkill -f "rotkehlchen" 2>/dev/null || true
 sleep 1
 
-# Start mock server in background (using rotki's venv which has our deps)
+# Start mock server in background
 echo "🚀 Starting mock premium server on port $MOCK_PORT..."
 cd "$ROTKI_DIR"
 PYTHONPATH="$PROJECT_DIR" uv run python -m spaetzli_mock_server --port $MOCK_PORT &
@@ -49,9 +69,11 @@ for i in {1..15}; do
 done
 
 # Start Rotki
-echo "🚀 Starting Rotki backend..."
+echo "🚀 Starting Rotki backend on port $ROTKI_PORT..."
 cd "$ROTKI_DIR"
-SPAETZLI_MOCK_URL="http://localhost:$MOCK_PORT" uv run python -m rotkehlchen --api-port 4242 --api-cors http://localhost:* &
+SPAETZLI_MOCK_URL="http://localhost:$MOCK_PORT" uv run python -m rotkehlchen \
+    --rest-api-port $ROTKI_PORT \
+    --api-cors "http://localhost:*" &
 ROTKI_PID=$!
 
 # Give Rotki a moment to start
@@ -60,19 +82,14 @@ sleep 5
 echo ""
 echo "✅ Both services started!"
 echo ""
-echo "📍 Rotki API:     http://localhost:4242"
+echo "📍 Rotki API:     http://localhost:$ROTKI_PORT"
 echo "📍 Mock Server:   http://localhost:$MOCK_PORT"
 echo ""
-echo "💡 To use the web UI, you have two options:"
-echo ""
-echo "   Option A: Use the Rotki frontend (recommended)"
-echo "   1. Open a new terminal"
-echo "   2. cd $ROTKI_DIR/frontend/app"
-echo "   3. npm install && npm run dev"
-echo "   4. Open http://localhost:8080"
-echo ""
-echo "   Option B: Use the installed Rotki app"
-echo "   The app will connect to localhost:4242 automatically"
+echo "💡 To use the web UI:"
+echo "   1. cd $ROTKI_DIR/frontend/app"
+echo "   2. pnpm install && pnpm run dev"
+echo "   3. Open the URL shown (usually http://localhost:5173)"
+echo "   4. The frontend will connect to Rotki on port $ROTKI_PORT"
 echo ""
 echo "Press Ctrl+C to stop services"
 echo ""

@@ -52,17 +52,9 @@ echo ""
 echo "=============================================="
 echo "✅ Spaetzli installed to: $INSTALL_DIR"
 echo ""
-echo "To start Spaetzli:"
-echo "  cd $INSTALL_DIR && ./scripts/start.sh"
+echo "To start Spaetzli, run:"
 echo ""
-echo "Or run this one-liner anytime:"
 echo "  cd ~/spaetzli && ./scripts/start.sh"
+echo ""
 echo "=============================================="
 echo ""
-
-# Ask if user wants to start now
-read -p "Start Spaetzli now? [Y/n] " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-    ./scripts/start.sh
-fi
