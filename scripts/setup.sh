@@ -12,19 +12,19 @@ echo "🐦 Spaetzli Setup"
 echo "================="
 echo ""
 
-# Check for uv (recommended) or Python 3.11+
-if command -v uv &> /dev/null; then
-    echo "✅ Found uv package manager"
-    USE_UV=1
-elif python3 --version 2>&1 | grep -q "3.11\|3.12"; then
-    echo "✅ Found compatible Python"
-    USE_UV=0
-else
-    echo "❌ This script requires either:"
-    echo "   - uv (recommended): brew install uv"
-    echo "   - Python 3.11+: brew install python@3.11"
-    exit 1
+# Check for uv
+if ! command -v uv &> /dev/null; then
+    echo "📦 Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+    
+    if ! command -v uv &> /dev/null; then
+        echo "❌ Failed to install uv. Please install manually:"
+        echo "   brew install uv"
+        exit 1
+    fi
 fi
+echo "✅ Found uv"
 
 # Clone Rotki if not present
 if [ ! -d "$ROTKI_DIR" ]; then
@@ -37,32 +37,25 @@ fi
 # Apply the Spaetzli patch to Rotki
 echo "🔧 Applying Spaetzli patch to Rotki..."
 cd "$ROTKI_DIR"
-if [ "$USE_UV" = "1" ]; then
-    uv run --no-project python "$SCRIPT_DIR/apply_patch.py" "$ROTKI_DIR/rotkehlchen/premium/premium.py"
-else
-    python3 "$SCRIPT_DIR/apply_patch.py" "$ROTKI_DIR/rotkehlchen/premium/premium.py"
-fi
 
-# Install Rotki dependencies (this also creates the venv)
-echo "📦 Installing Rotki dependencies (this may take several minutes)..."
+# Use uv to run Python (it will fetch Python 3.11 if needed)
+uv run --python 3.11 python "$SCRIPT_DIR/apply_patch.py" "$ROTKI_DIR/rotkehlchen/premium/premium.py"
+
+# Create venv with Python 3.11 and install dependencies
+echo "📦 Creating Python 3.11 environment and installing dependencies..."
+echo "   (This may take several minutes on first run)"
 cd "$ROTKI_DIR"
 
-if [ "$USE_UV" = "1" ]; then
-    echo "   Syncing with uv..."
-    uv sync 2>&1 | tail -10
-else
-    python3 -m pip install -e .
-fi
+# Force uv to use Python 3.11
+uv venv --python 3.11 .venv 2>/dev/null || uv venv .venv
 
-# Install mock server dependencies into Rotki's venv
+# Sync dependencies
+echo "   Syncing Rotki dependencies..."
+uv sync 2>&1 | tail -15
+
+# Install mock server dependencies
 echo "📦 Installing mock server dependencies..."
-cd "$PROJECT_DIR"
-if [ "$USE_UV" = "1" ]; then
-    cd "$ROTKI_DIR"
-    uv pip install fastapi uvicorn python-multipart 2>&1 | tail -5
-else
-    python3 -m pip install --quiet fastapi uvicorn python-multipart
-fi
+uv pip install fastapi uvicorn python-multipart 2>&1 | tail -5
 
 cd "$PROJECT_DIR"
 
