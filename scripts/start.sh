@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ROTKI_DIR="$PROJECT_DIR/rotki"
-FRONTEND_DIR="$ROTKI_DIR/frontend"
+FRONTEND_DIR="$ROTKI_DIR/frontend/app"
 
 # Function to find a free port
 find_free_port() {
@@ -53,8 +53,9 @@ fi
 # Find free ports
 MOCK_PORT=$(find_free_port 8090)
 ROTKI_PORT=$(find_free_port 4242)
+FRONTEND_PORT=$(find_free_port 5173)
 
-echo "📍 Using ports: Mock=$MOCK_PORT, Rotki API=$ROTKI_PORT"
+echo "📍 Using ports: Mock=$MOCK_PORT, Rotki=$ROTKI_PORT, Frontend=$FRONTEND_PORT"
 echo ""
 
 # Kill any existing processes
@@ -72,7 +73,7 @@ MOCK_PID=$!
 echo "⏳ Waiting for mock server..."
 for i in {1..15}; do
     if curl -s "http://localhost:$MOCK_PORT/health" > /dev/null 2>&1; then
-        echo "✅ Mock server ready on port $MOCK_PORT"
+        echo "✅ Mock server ready"
         break
     fi
     sleep 1
@@ -90,7 +91,7 @@ ROTKI_PID=$!
 echo "⏳ Waiting for Rotki backend..."
 for i in {1..30}; do
     if curl -s "http://localhost:$ROTKI_PORT/api/1/ping" > /dev/null 2>&1; then
-        echo "✅ Rotki backend ready on port $ROTKI_PORT"
+        echo "✅ Rotki backend ready"
         break
     fi
     sleep 1
@@ -98,22 +99,25 @@ done
 
 # Install frontend dependencies if needed
 echo "🚀 Setting up frontend..."
-cd "$FRONTEND_DIR"
+cd "$ROTKI_DIR/frontend"
 if [ ! -d "node_modules" ]; then
-    echo "📦 Installing frontend dependencies (first time only)..."
-    pnpm install 2>&1 | tail -5
+    echo "📦 Installing frontend dependencies (first time only, please wait)..."
+    pnpm install 2>&1 | tail -10
 fi
 
-# Start frontend dev server
+# Start frontend using vite directly (bypasses Python venv check)
 echo "🚀 Starting frontend..."
-VITE_BACKEND_URL="http://localhost:$ROTKI_PORT" pnpm -w run dev > /tmp/spaetzli-frontend.log 2>&1 &
+cd "$FRONTEND_DIR"
+
+# Set the backend URL for the frontend
+export VITE_BACKEND_URL="http://localhost:$ROTKI_PORT"
+
+# Run vite directly
+npx vite --port $FRONTEND_PORT --host > /tmp/spaetzli-frontend.log 2>&1 &
 FRONTEND_PID=$!
 
-# Wait for frontend to be ready
-sleep 5
-
-# Try to detect frontend port from log
-FRONTEND_PORT=$(grep -oE "localhost:[0-9]+" /tmp/spaetzli-frontend.log 2>/dev/null | head -1 | cut -d: -f2 || echo "5173")
+# Wait for frontend
+sleep 3
 
 echo ""
 echo "=============================================="
@@ -127,6 +131,7 @@ echo "   Rotki API:   http://localhost:$ROTKI_PORT"
 echo "   Mock Server: http://localhost:$MOCK_PORT"
 echo ""
 echo "💡 Go to Settings → Premium and enter any API key/secret"
+echo "   Example: key='test' secret='dGVzdA=='"
 echo ""
 echo "📝 Logs: /tmp/spaetzli-*.log"
 echo "=============================================="
