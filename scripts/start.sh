@@ -9,19 +9,10 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ROTKI_DIR="$PROJECT_DIR/rotki"
 FRONTEND_DIR="$ROTKI_DIR/frontend/app"
 
-# Function to find a free port
-find_free_port() {
-    local start_port=$1
-    local port=$start_port
-    while lsof -i :$port >/dev/null 2>&1; do
-        port=$((port + 1))
-        if [ $port -gt $((start_port + 100)) ]; then
-            echo "❌ Could not find free port" >&2
-            exit 1
-        fi
-    done
-    echo $port
-}
+# Fixed ports for reliability
+MOCK_PORT=18090
+ROTKI_PORT=14242
+FRONTEND_PORT=15173
 
 echo "🐦 Starting Spaetzli"
 echo "==================="
@@ -40,30 +31,25 @@ if [ ! -d "$ROTKI_DIR/.venv" ]; then
     exit 1
 fi
 
-# Check for pnpm, install if missing
+# Check for pnpm
 if ! command -v pnpm &> /dev/null; then
     echo "📦 Installing pnpm..."
-    npm install -g pnpm@latest-10 2>/dev/null || {
-        echo "❌ Failed to install pnpm. Please install manually:"
-        echo "   npm install -g pnpm"
-        exit 1
-    }
+    npm install -g pnpm@latest-10
 fi
 
-# Find free ports
-MOCK_PORT=$(find_free_port 8090)
-ROTKI_PORT=$(find_free_port 4242)
-FRONTEND_PORT=$(find_free_port 5173)
+# Kill any existing processes on our ports
+echo "🧹 Cleaning up old processes..."
+pkill -f "spaetzli_mock_server" 2>/dev/null || true
+pkill -f "rotkehlchen" 2>/dev/null || true
+lsof -ti :$MOCK_PORT | xargs kill -9 2>/dev/null || true
+lsof -ti :$ROTKI_PORT | xargs kill -9 2>/dev/null || true
+lsof -ti :$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+sleep 2
 
 echo "📍 Using ports: Mock=$MOCK_PORT, Rotki=$ROTKI_PORT, Frontend=$FRONTEND_PORT"
 echo ""
 
-# Kill any existing processes
-pkill -f "spaetzli_mock_server" 2>/dev/null || true
-pkill -f "rotkehlchen" 2>/dev/null || true
-sleep 1
-
-# Start mock server in background
+# Start mock server
 echo "🚀 Starting mock premium server..."
 cd "$ROTKI_DIR"
 PYTHONPATH="$PROJECT_DIR" uv run python -m spaetzli_mock_server --port $MOCK_PORT > /tmp/spaetzli-mock.log 2>&1 &
@@ -84,7 +70,7 @@ echo "🚀 Starting Rotki backend..."
 cd "$ROTKI_DIR"
 SPAETZLI_MOCK_URL="http://localhost:$MOCK_PORT" uv run python -m rotkehlchen \
     --rest-api-port $ROTKI_PORT \
-    --api-cors "http://localhost:*" > /tmp/spaetzli-rotki.log 2>&1 &
+    --api-cors "http://localhost:*,http://127.0.0.1:*" > /tmp/spaetzli-rotki.log 2>&1 &
 ROTKI_PID=$!
 
 # Wait for Rotki
@@ -98,59 +84,56 @@ for i in {1..30}; do
 done
 
 # Install frontend dependencies if needed
-echo "🚀 Setting up frontend..."
 cd "$ROTKI_DIR/frontend"
 if [ ! -d "node_modules" ]; then
-    echo "📦 Installing frontend dependencies (first time only, please wait)..."
+    echo "📦 Installing frontend dependencies (first time, please wait)..."
     pnpm install 2>&1 | tail -10
 fi
 
-# Start frontend using vite directly (bypasses Python venv check)
+# Create .env.local with correct URLs
+echo "🔧 Configuring frontend..."
+cat > "$FRONTEND_DIR/.env.local" << EOF
+VITE_BACKEND_URL=http://127.0.0.1:$ROTKI_PORT
+VITE_COLIBRI_URL=http://127.0.0.1:$ROTKI_PORT
+EOF
+
+# Start frontend
 echo "🚀 Starting frontend..."
 cd "$FRONTEND_DIR"
-
-# Set the backend URL for the frontend
-export VITE_BACKEND_URL="http://localhost:$ROTKI_PORT"
-
-# Run vite directly
 npx vite --port $FRONTEND_PORT --host > /tmp/spaetzli-frontend.log 2>&1 &
 FRONTEND_PID=$!
 
-# Wait for frontend
 sleep 3
 
 echo ""
 echo "=============================================="
 echo "✅ Spaetzli is running!"
 echo ""
-echo "🌐 Open in browser: http://localhost:$FRONTEND_PORT"
+echo "🌐 Open: http://localhost:$FRONTEND_PORT"
 echo ""
 echo "📍 Services:"
 echo "   Frontend:    http://localhost:$FRONTEND_PORT"
 echo "   Rotki API:   http://localhost:$ROTKI_PORT"
 echo "   Mock Server: http://localhost:$MOCK_PORT"
 echo ""
-echo "💡 Go to Settings → Premium and enter any API key/secret"
+echo "💡 Enter any API key/secret for premium"
 echo "   Example: key='test' secret='dGVzdA=='"
 echo ""
 echo "📝 Logs: /tmp/spaetzli-*.log"
 echo "=============================================="
 echo ""
-echo "Press Ctrl+C to stop all services"
-echo ""
+echo "Press Ctrl+C to stop"
 
-# Handle shutdown
+# Cleanup handler
 cleanup() {
     echo ""
     echo "🛑 Shutting down..."
-    kill $MOCK_PID 2>/dev/null || true
-    kill $ROTKI_PID 2>/dev/null || true
-    kill $FRONTEND_PID 2>/dev/null || true
+    kill $MOCK_PID $ROTKI_PID $FRONTEND_PID 2>/dev/null || true
     pkill -f "spaetzli_mock_server" 2>/dev/null || true
     pkill -f "rotkehlchen" 2>/dev/null || true
+    rm -f "$FRONTEND_DIR/.env.local"
     exit 0
 }
 trap cleanup SIGINT SIGTERM
 
-# Wait
 wait
